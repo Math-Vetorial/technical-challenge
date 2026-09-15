@@ -8,6 +8,7 @@ raises on a bad response, so the engine can isolate and retry the failure per wo
 from __future__ import annotations
 
 import asyncio
+import shutil
 from pathlib import Path
 
 from curl_cffi import requests as cffi_requests
@@ -16,6 +17,7 @@ from curl_cffi.requests import RequestsError
 from data_foundry.config import Settings
 from data_foundry.orchestrator.engine import TransientError
 from data_foundry.schemas import RawListingEntry, WorkDetail
+from data_foundry.stages import fixtures_source
 
 _SESSION = cffi_requests.Session(impersonate="chrome")
 _MIN_VALID_PDF_BYTES = 1000
@@ -32,11 +34,18 @@ def _download_sync(url: str, timeout: int) -> bytes:
 
 
 async def download_pdf(raw: RawListingEntry, detail: WorkDetail, settings: Settings) -> Path:
-    """Download `detail.download_url` to `data/raw/pdfs/<code>.pdf`. Skips if already present."""
+    """Download `detail.download_url` to `data/raw/pdfs/<code>.pdf`. Skips if already present.
+
+    `settings.source == "fixtures"` copies the fixture PDF instead — no network.
+    """
     pdf_dir = settings.raw_dir / "pdfs"
     pdf_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = pdf_dir / f"{raw.code}.pdf"
     if pdf_path.exists():
+        return pdf_path
+
+    if settings.source == "fixtures":
+        await asyncio.to_thread(shutil.copyfile, fixtures_source.fixture_pdf_path(raw.code), pdf_path)
         return pdf_path
 
     if not detail.download_url:

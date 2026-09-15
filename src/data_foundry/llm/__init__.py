@@ -1,2 +1,2 @@
-# LLMProvider Protocol + StubProvider live in base.py.
-# TODO(step-4): mock/ollama/openai providers, offline-mockable via the `mock` backend.
+# LLMProvider Protocol (base.py); MockProvider (mock.py) and OpenAIProvider (openai_provider.py)
+# implement it; factory.get_provider(settings) selects between them via LLM_PROVIDER.

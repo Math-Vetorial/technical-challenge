@@ -29,14 +29,13 @@ def render_pages_base64(pdf_path: Path, max_pages: int = MAX_PAGES) -> list[str]
         doc.close()
 
 
-def _metadata_context(detail: WorkDetail | None) -> dict[str, str]:
-    if detail is None:
-        return {}
+def _metadata_context(raw: RawListingEntry, detail: WorkDetail | None) -> dict[str, str]:
     fields = {
-        "category": detail.category,
-        "language": detail.language,
-        "institution": detail.institution,
-        "year": detail.year,
+        "code": raw.code,
+        "category": detail.category if detail else None,
+        "language": detail.language if detail else None,
+        "institution": detail.institution if detail else None,
+        "year": detail.year if detail else None,
     }
     return {k: v for k, v in fields.items() if v}
 
@@ -47,4 +46,4 @@ async def describe(
     images = render_pages_base64(pdf_path)
     if not images:
         return None
-    return await provider.describe(images, raw.title, _metadata_context(detail))
+    return await provider.describe(images, raw.title, _metadata_context(raw, detail))

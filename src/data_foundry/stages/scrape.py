@@ -23,6 +23,7 @@ from data_foundry.config import Settings
 from data_foundry.logging_setup import get_logger
 from data_foundry.orchestrator.engine import TransientError
 from data_foundry.schemas import RawListingEntry, WorkDetail
+from data_foundry.stages import fixtures_source
 
 logger = get_logger(__name__)
 
@@ -114,7 +115,15 @@ def parse_listing(html: str) -> list[RawListingEntry]:
 
 
 async def scrape_listing(settings: Settings, limit: int | None = None) -> AsyncIterator[RawListingEntry]:
-    """Yield works page by page until the listing is exhausted or `limit` is reached."""
+    """Yield works page by page until the listing is exhausted or `limit` is reached.
+
+    `settings.source == "fixtures"` replays the committed fixture catalog instead — no network.
+    """
+    if settings.source == "fixtures":
+        for entry in fixtures_source.list_fixture_entries(limit):
+            yield entry
+        return
+
     yielded = 0
     page = 1
     while limit is None or yielded < limit:
@@ -170,7 +179,13 @@ def _find_download_url(html: str, base_url: str) -> str | None:
 
 async def fetch_detail(code: str, settings: Settings) -> WorkDetail:
     """Fetch and parse a work's detail page. Raises `TransientError` on a network failure — the
-    caller (`pipeline.py`, via `with_retry`) is what retries it, not this function."""
+    caller (`pipeline.py`, via `with_retry`) is what retries it, not this function.
+
+    `settings.source == "fixtures"` returns the fixture's detail instead — no network.
+    """
+    if settings.source == "fixtures":
+        return fixtures_source.fixture_detail(code)
+
     detail_url = f"{settings.base_url}/DetalheObraForm.do?select_action=&co_obra={code}"
     html = await fetch_page(detail_url, settings)
     metadata = _parse_detail_page(html)

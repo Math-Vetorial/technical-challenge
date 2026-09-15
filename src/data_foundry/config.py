@@ -18,12 +18,15 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # LLM — TODO(step-4): consumed by the pluggable provider abstraction (mock/ollama/openai)
+    # LLM — consumed by llm/factory.get_provider; swap vendors via LLM_PROVIDER, no code change
+    llm_provider: str = "openai"  # "mock" | "openai" (openai-compatible: Ollama or OpenAI itself)
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: str = "ollama"
     llm_model: str = "gemma4:e2b"
 
-    # Source — consumed by the scrape/download stages
+    # Source — "live" scrapes dominiopublico.mec.gov.br; "fixtures" replays tests/fixtures/ for a
+    # fully offline run (no network/GPU) — see stages/fixtures_source.py.
+    source: str = "live"
     base_url: str = "https://dominiopublico.mec.gov.br/pesquisa"
     list_url: str = (
         "https://dominiopublico.mec.gov.br/pesquisa/ResultadoPesquisaObraForm.do?"

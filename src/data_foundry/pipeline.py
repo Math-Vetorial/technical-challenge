@@ -25,7 +25,8 @@ from pathlib import Path
 
 from data_foundry.config import Settings
 from data_foundry.config import settings as default_settings
-from data_foundry.llm.base import LLMProvider, StubProvider
+from data_foundry.llm.base import LLMProvider
+from data_foundry.llm.factory import get_provider
 from data_foundry.logging_setup import get_logger
 from data_foundry.orchestrator.engine import STOP, run_worker_pool, with_retry
 from data_foundry.orchestrator.events import (
@@ -227,15 +228,21 @@ async def run(
     limit: int | None = None,
     only: str | None = None,
     provider: LLMProvider | None = None,
+    bus: EventBus | None = None,
 ) -> RunContext:
-    """Run the full event-driven pipeline (or a single stage in isolation via `only`)."""
-    provider = provider or StubProvider()
+    """Run the full event-driven pipeline (or a single stage in isolation via `only`).
+
+    `bus` is injectable so tests/callers can subscribe to per-work events (Hashed, Described, ...)
+    before the run starts — there's nowhere else to observe that enrichment yet (TODO(step-5):
+    once it's persisted to `data/staging/`, that becomes the durable way to inspect it).
+    """
+    provider = provider or get_provider(settings)
 
     if only is not None:
         return await _run_only_stage(only, settings)
 
     ctx = RunContext.create(settings)
-    bus = EventBus()
+    bus = bus or EventBus()
 
     async def on_failed(event: WorkFailed) -> None:
         _log_failure(event)
