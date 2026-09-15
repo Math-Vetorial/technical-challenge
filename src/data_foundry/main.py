@@ -1,53 +1,25 @@
-import subprocess
-import sys
-from pathlib import Path
+"""Minimal entrypoint: builds a run, logs, writes a manifest. No stages wired yet."""
 
-SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
+from __future__ import annotations
 
-STEPS = [
-    ("01_download.py", "Scrape catalog and download PDFs"),
-    ("02_hash.py", "Calculate document hashes"),
-    ("03_describe.py", "Generate descriptions via vision LLM"),
-    ("04_translate.py", "Translate titles"),
-    ("05_translate_descriptions.py", "Translate descriptions"),
-    ("06_covers.py", "Extract cover pages"),
-    ("07_localized_catalog.py", "Assemble localized catalog"),
-    ("08_universal_metadata.py", "Assemble universal metadata"),
-]
+from data_foundry.config import settings
+from data_foundry.logging_setup import get_logger
+from data_foundry.run import RunContext
+
+logger = get_logger(__name__)
 
 
-def run_step(script: str, description: str) -> bool:
-    print(f"\n{'=' * 60}")
-    print(f"  {description}")
-    print(f"  Running: {script}")
-    print(f"{'=' * 60}\n")
+def main() -> None:
+    logger.info("run started")
+    ctx = RunContext.create(settings)
+    logger.info("run created run_id=%s dir=%s", ctx.run_id, ctx.run_dir)
 
-    result = subprocess.run(
-        [sys.executable, str(SCRIPTS_DIR / script)],
-        cwd=str(SCRIPTS_DIR.parent),
-    )
-    return result.returncode == 0
+    # TODO(step-3): wire the event-driven orchestrator here (scrape -> download ->
+    # hash/describe/cover (fan-out) -> assemble (barrier)). Stages are not wired yet.
+    logger.info("stages not wired yet; this is a foundations-only run")
 
-
-def main():
-    print("Domínio Público Data Pipeline")
-    print("=" * 60)
-
-    results = {}
-    for script, description in STEPS:
-        success = run_step(script, description)
-        results[script] = "ok" if success else "failed"
-
-        if not success:
-            print(f"\nStep failed: {script}. Stopping pipeline.")
-            break
-
-    print(f"\n{'=' * 60}")
-    print("Pipeline Summary")
-    print(f"{'=' * 60}")
-    for script, status in results.items():
-        icon = {"ok": "+", "failed": "X"}[status]
-        print(f"  [{icon}] {script}: {status}")
+    ctx.finish("success")
+    logger.info("run finished status=success manifest=%s", ctx.manifest_path)
 
 
 if __name__ == "__main__":

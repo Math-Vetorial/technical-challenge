@@ -16,7 +16,10 @@ wheels/
 .pytest_cache/
 uv.lock
 
-# Data (downloaded at runtime)
+# Data (downloaded/generated at runtime)
 data/pdfs/
 data/output/
+data/raw/
+data/staging/
+data/curated/
 .DS_Store
