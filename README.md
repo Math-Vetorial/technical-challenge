@@ -12,6 +12,20 @@ This started from 8 flat scripts (`scrape → download → hash → describe →
 assemble`). They were refactored into typed, async stage functions wired by a small home-grown
 event-driven engine — no external orchestrator, no flat `data/output/`.
 
+## Contents
+
+- [Quickstart](#quickstart)
+- [Architecture](#architecture)
+- [The two output datasets](#the-two-output-datasets)
+- [Design decisions & trade-offs](#design-decisions--trade-offs)
+- [Data quality](#data-quality)
+- [Operational notes](#operational-notes)
+- [Testing](#testing)
+- [Which target areas are covered](#which-target-areas-are-covered)
+- [What I'd do differently at scale](#what-id-do-differently-at-scale)
+- [Project layout](#project-layout)
+- [Docker / Compose](#docker--compose)
+
 ---
 
 ## Quickstart
