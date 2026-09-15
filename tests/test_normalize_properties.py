@@ -1,24 +1,18 @@
 """Property-based tests for the pure normalizers in `data_foundry.quality.normalize`.
 
 Invariants are derived from the real signatures/behavior of the functions (see normalize.py),
-not assumed. Known deviations from an "ideal" invariant are called out explicitly rather than
+not assumed. One known deviation from an "ideal" invariant is called out explicitly rather than
 silently patched:
 
 - `fix_encoding` has signature `str` (not `str | None`) and its only caller (`clean_text`)
   already guards against `None` before calling it, so it is excluded from the None-robustness
   property and only exercised with `st.text()`.
-- `clean_text` can still return a string containing `\\xa0` for mojibake input like `"Â\\xa0"`
-  (a UTF-8 double-encoded nbsp): the nbsp strip happens *before* `fix_encoding`, and `ftfy` can
-  reintroduce `\\xa0` while repairing the mojibake. This looks like a real order-of-operations
-  bug in `clean_text`, confirmed with the project owner. It is captured below as an `xfail`
-  example rather than fixed here (no pipeline code changes in this commit).
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
-import pytest
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
@@ -91,13 +85,6 @@ def test_clean_text_postconditions(s: str | None) -> None:
 
 @example(s="aÂ\xa0b")
 @given(s=st.one_of(st.text(), st.none()))
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "known bug: clean_text strips \\xa0 before fix_encoding, so ftfy can reintroduce "
-        "\\xa0 while repairing mojibake like 'Â\\xa0' -> '\\xa0' (see module docstring)"
-    ),
-)
 def test_clean_text_never_leaves_nbsp(s: str | None) -> None:
     result = clean_text(s)
     if result is not None:

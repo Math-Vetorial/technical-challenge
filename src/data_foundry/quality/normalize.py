@@ -50,9 +50,9 @@ def clean_text(s: str | None) -> str | None:
     """Strip, collapse whitespace (including nbsp), fix encoding. `None` if the result is empty."""
     if s is None:
         return None
-    text = s.replace("\xa0", " ")
+    text = fix_encoding(s)
+    text = text.replace("\xa0", " ")
     text = _WHITESPACE_RE.sub(" ", text).strip()
-    text = fix_encoding(text)
     return text or None
 
 
