@@ -10,7 +10,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, RootModel, field_validator
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
-_MIN_YEAR = 1400
+MIN_PLAUSIBLE_YEAR = 1400
 
 
 class LangField(BaseModel):
@@ -90,9 +90,53 @@ class UniversalRecord(BaseModel):
     @field_validator("year")
     @classmethod
     def _validate_year(cls, v: int | None) -> int | None:
-        if v is not None and not (_MIN_YEAR <= v <= datetime.now(UTC).year + 1):
+        if v is not None and not (MIN_PLAUSIBLE_YEAR <= v <= datetime.now(UTC).year + 1):
             raise ValueError(f"year out of plausible range: {v}")
         return v
+
+
+class EnrichedWork(BaseModel):
+    """Everything gathered about one work before curation (Step 2 input shape).
+
+    TODO(step-3): the orchestrator builds these from the scrape/download/hash/describe/
+    translate/cover stage outputs and hands them to `quality.curate.curate_works`.
+    """
+
+    raw: RawListingEntry
+    detail: WorkDetail | None = None
+    document_hash: str | None = None
+    cover_path: str | None = None
+    cover_hash: str | None = None
+    size_bytes: int | None = None
+    description: str | None = None  # PT description, as produced by the vision LLM
+    title_translations: dict[str, str] = Field(default_factory=dict)
+    description_translations: dict[str, str] = Field(default_factory=dict)
+
+
+class QuarantinedRecord(BaseModel):
+    """A work that failed validation during curation — isolated, not dropped silently."""
+
+    id: str
+    reason: str
+    raw: dict[str, Any]
+
+
+class DuplicateGroup(BaseModel):
+    """Ids that share a content hash. `canonical` is kept, the rest are duplicates of it."""
+
+    hash: str
+    ids: list[str]
+    canonical: str
+
+
+class QualityReport(BaseModel):
+    total_works: int
+    valid_works: int
+    quarantined: list[QuarantinedRecord] = Field(default_factory=list)
+    duplicate_document_groups: list[DuplicateGroup] = Field(default_factory=list)
+    duplicate_cover_groups: list[DuplicateGroup] = Field(default_factory=list)
+    missing_by_field: dict[str, int] = Field(default_factory=dict)
+    coverage: dict[str, float] = Field(default_factory=dict)
 
 
 class LocalizedCatalog(RootModel[list[LocalizedRecord]]):
