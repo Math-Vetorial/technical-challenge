@@ -278,7 +278,7 @@ async def run(
 
     if limit == 0:
         logger.info("limit=0: discovery-only dry run, no network calls made")
-        ctx.finish("success")
+        ctx.finish("success", update_latest=False)
         return ctx
 
     counters = Counters()
@@ -325,6 +325,10 @@ async def _run_only_stage(stage: str, settings: Settings) -> RunContext:
     A full `run()` now persists per-work state to `data/staging/works/<code>.json`; teaching this
     ad-hoc single-stage path (describe/translate need catalog context) to replay from it is a
     future enhancement, not needed by anything that calls `--only` today.
+
+    This never produces the curated datasets, so it must not repoint `latest` — `latest` is only
+    ever allowed to point at a run that has both `localized_catalog.json` and
+    `universal_metadata.json`.
     """
     if stage not in ONLY_STAGES:
         raise ValueError(f"unknown stage {stage!r}, expected one of {ONLY_STAGES}")
@@ -348,5 +352,5 @@ async def _run_only_stage(stage: str, settings: Settings) -> RunContext:
     else:
         logger.warning("--only %s needs per-work state from data/staging/ (TODO step-5); nothing to do", stage)
 
-    ctx.finish("success")
+    ctx.finish("success", update_latest=False)
     return ctx

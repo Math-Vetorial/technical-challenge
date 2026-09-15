@@ -112,11 +112,11 @@ class RunContext:
         self.manifest.output_hashes[name] = _sha256_file(path)
         self.write_manifest()
 
-    def finish(self, status: Literal["success", "failed"]) -> None:
+    def finish(self, status: Literal["success", "failed"], *, update_latest: bool = True) -> None:
         self.manifest.status = status
         self.manifest.finished_at = datetime.now(UTC)
         self.write_manifest()
-        if status == "success":
+        if status == "success" and update_latest:
             self._update_latest_pointer()
 
     def _update_latest_pointer(self) -> None:
