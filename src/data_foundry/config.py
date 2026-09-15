@@ -64,10 +64,20 @@ class Settings(BaseSettings):
         return self.data_dir / "curated"
 
     def redacted(self) -> dict[str, Any]:
-        """Settings as a plain dict with the LLM secret masked, safe for a manifest."""
+        """Settings as a plain dict, safe to embed in a run's manifest: the LLM secret masked,
+        and the local layer paths relativized to the repo root (or just the layer name, if a
+        path lives elsewhere, e.g. a test's tmp_path) — the manifest is an auditable datasheet,
+        not a record of whichever machine happened to run it.
+        """
         data = self.model_dump(mode="json")
         if data.get("llm_api_key"):
             data["llm_api_key"] = "***redacted***"
+        for key in ("data_dir", "raw_dir", "staging_dir", "curated_dir"):
+            path = Path(data[key])
+            try:
+                data[key] = str(path.relative_to(REPO_ROOT))
+            except ValueError:
+                data[key] = path.name
         return data
 
 

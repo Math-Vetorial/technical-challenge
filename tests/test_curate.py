@@ -38,8 +38,8 @@ def test_build_universal_well_formed():
     assert record.run_id == "20260101T000000Z-aaaaaaaa"
 
 
-def test_build_universal_cover_path_is_relative_to_data_dir():
-    data_dir = Path("/Users/someone/project/data")
+def test_build_universal_cover_path_is_relative_to_data_dir(tmp_path):
+    data_dir = tmp_path / "data"
     absolute_cover = data_dir / "raw" / "covers" / ("a" * 64 + ".png")
 
     record = build_universal(

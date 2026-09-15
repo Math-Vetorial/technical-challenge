@@ -120,7 +120,11 @@ class RunContext:
             self._update_latest_pointer()
 
     def _update_latest_pointer(self) -> None:
-        """Point curated_dir/latest at this run. Real symlink, falling back to latest.txt."""
+        """Point curated_dir/latest at this run. Real symlink, falling back to latest.txt.
+
+        The symlink target is relative (`runs/<run_id>`), not absolute — so `latest` keeps
+        resolving correctly if the project directory is ever moved or mounted elsewhere.
+        """
         latest_path = self.settings.curated_dir / "latest"
         latest_txt = self.settings.curated_dir / "latest.txt"
 
@@ -128,7 +132,7 @@ class RunContext:
             latest_path.unlink()
 
         try:
-            latest_path.symlink_to(self.run_dir, target_is_directory=True)
+            latest_path.symlink_to(Path("runs") / self.run_id, target_is_directory=True)
             latest_txt.unlink(missing_ok=True)
         except OSError:
             latest_txt.write_text(self.run_id, encoding="utf-8")
