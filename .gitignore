@@ -27,3 +27,7 @@ data/curated/
 tests/fixtures/pdfs/_generated/
 
 .DS_Store
+
+# Notas de planejamento locais (fora do deliverable)
+CLAUDE.md
+docs/specs/
