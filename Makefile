@@ -1,4 +1,4 @@
-.PHONY: setup setup-ollama ollama-up ollama-pull run run-local run-all download hash describe translate translate-descriptions covers test lint
+.PHONY: setup setup-ollama ollama-up ollama-pull run run-local run-offline run-all download hash describe translate translate-descriptions covers test lint
 
 ollama-up:
 	docker compose up -d ollama
@@ -8,6 +8,7 @@ ollama-pull:
 
 setup:
 	uv sync --group dev
+	test -f .env || cp .env.example .env
 
 setup-ollama: setup ollama-up ollama-pull
 
@@ -16,6 +17,11 @@ run:
 
 run-local:
 	uv run python -m data_foundry run
+
+# Fully offline: no network, no GPU. Deterministic mock LLM + committed/generated PDF fixtures —
+# the same env `make test` uses, just driving the CLI end-to-end instead of pytest.
+run-offline:
+	LLM_PROVIDER=mock SOURCE=fixtures uv run python -m data_foundry run --limit 12
 
 download:
 	uv run python -m data_foundry run --only download
@@ -35,8 +41,8 @@ translate-descriptions:
 covers:
 	uv run python -m data_foundry run --only covers
 
-# TODO(step-5): localized-catalog / universal-metadata (assembly) aren't stages yet — they'll
-# consume quality.curate/dedup/report once per-work state is persisted to data/staging/.
+# Assembly (the two datasets + quality report) isn't a standalone `--only` target — it always
+# runs as the last step of a full `run`/`run-local`/`run-offline`, right after the barrier.
 
 run-all: download hash describe translate translate-descriptions covers
 
