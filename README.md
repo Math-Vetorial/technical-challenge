@@ -362,6 +362,16 @@ All five. Nothing here is aspirational — each row is code that exists and is t
 - **LLM reliability** — structured outputs (JSON/Pydantic-validated), a gold set with a measured
   error rate, confidence-based routing to a stronger model on low-confidence output, and an
   LLM-as-a-judge pass for QA sampling.
+- **Ground descriptions in the document's text, not its cover.** `describe` today renders page 1
+  to an image and sends that to a vision model — inherited straight from the original scaffold
+  (`03_describe.py`, `MAX_PAGES=1`) — but a cover is a weak signal (it rarely summarizes the
+  content) and isn't even cheaper, since vision tokens cost more than text ones. The fix is to
+  extract text from the first few pages with PyMuPDF (`page.get_text()`) and ground the prompt in
+  that instead — a small grounding/mini-RAG step, and the most accurate source available, since
+  Domínio Público's detail page has no synopsis field of its own. I deliberately ruled out the
+  cheapest option — title + author alone, leaning on the model's parametric knowledge — because it
+  hallucinates on obscure works, and most of this catalog (old theses, monographs) is exactly
+  that; a confidently wrong description is worse than a weak one.
 - **Observability** — metrics/traces on stage latency and failure rates, plus freshness/volume
   alerts on the curated output (this manifest answers "what happened" after the fact; production
   needs to know *while* it's happening).
