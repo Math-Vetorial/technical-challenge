@@ -89,6 +89,6 @@ over-build ahead of the current spec.
 ## Runbook
 
 - `uv sync` — install deps
-- `uv run python -m data_foundry` — run the pipeline (offline-capable with the mock LLM)
+- `uv run python -m data_foundry run` — run the pipeline (offline-capable with the mock LLM; `--only STAGE` / `--limit N` supported)
 - `make test` / `uv run pytest -v` — tests
 - `make run` — full pipeline via Docker (Ollama), for the real enrichment run

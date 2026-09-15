@@ -1,4 +1,4 @@
-.PHONY: setup setup-ollama ollama-up ollama-pull run run-all download hash describe translate translate-descriptions covers localized-catalog universal-metadata test lint
+.PHONY: setup setup-ollama ollama-up ollama-pull run run-local run-all download hash describe translate translate-descriptions covers test lint
 
 ollama-up:
 	docker compose up -d ollama
@@ -14,31 +14,31 @@ setup-ollama: setup ollama-up ollama-pull
 run:
 	docker compose up --build pipeline
 
+run-local:
+	uv run python -m data_foundry run
+
 download:
-	uv run python src/data_foundry/scripts/01_download.py
+	uv run python -m data_foundry run --only download
 
 hash:
-	uv run python src/data_foundry/scripts/02_hash.py
+	uv run python -m data_foundry run --only hash
 
 describe:
-	uv run python src/data_foundry/scripts/03_describe.py
+	uv run python -m data_foundry run --only describe
 
 translate:
-	uv run python src/data_foundry/scripts/04_translate.py
+	uv run python -m data_foundry run --only translate
 
 translate-descriptions:
-	uv run python src/data_foundry/scripts/05_translate_descriptions.py
+	uv run python -m data_foundry run --only translate-descriptions
 
 covers:
-	uv run python src/data_foundry/scripts/06_covers.py
+	uv run python -m data_foundry run --only covers
 
-localized-catalog:
-	uv run python src/data_foundry/scripts/07_localized_catalog.py
+# TODO(step-5): localized-catalog / universal-metadata (assembly) aren't stages yet — they'll
+# consume quality.curate/dedup/report once per-work state is persisted to data/staging/.
 
-universal-metadata:
-	uv run python src/data_foundry/scripts/08_universal_metadata.py
-
-run-all: download hash describe translate translate-descriptions covers localized-catalog universal-metadata
+run-all: download hash describe translate translate-descriptions covers
 
 test:
 	uv run pytest tests/ -v

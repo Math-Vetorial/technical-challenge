@@ -8,4 +8,4 @@ COPY . .
 
 RUN uv sync
 
-CMD ["uv", "run", "python", "src/data_foundry/main.py"]
+CMD ["uv", "run", "python", "-m", "data_foundry", "run"]

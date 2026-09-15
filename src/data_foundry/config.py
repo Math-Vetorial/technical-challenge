@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     llm_api_key: str = "ollama"
     llm_model: str = "gemma4:e2b"
 
-    # Source — TODO(step-2/3): consumed by the scraping/download stage
+    # Source — consumed by the scrape/download stages
     base_url: str = "https://dominiopublico.mec.gov.br/pesquisa"
     list_url: str = (
         "https://dominiopublico.mec.gov.br/pesquisa/ResultadoPesquisaObraForm.do?"
@@ -36,12 +36,14 @@ class Settings(BaseSettings):
     # Layers — bronze/silver/gold roots
     data_dir: Path = REPO_ROOT / "data"
 
-    # Scale knobs — TODO(step-3): consumed by the async orchestrator
+    # Scale knobs — consumed by the async orchestrator (orchestrator/engine.py, pipeline.py)
     download_concurrency: int = 4
     llm_concurrency: int = 2
     request_timeout_s: int = 30
     max_retries: int = 3
     min_books: int = 10
+    queue_maxsize: int = 16
+    retry_base_delay_s: float = 0.5
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -67,14 +69,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-# TODO(step-2/3): scripts/ still import these flat constants directly; drop them once the
-# scripts' logic is refactored into stages/ and they consume `settings` instead.
-BASE_URL = settings.base_url
-LIST_URL = settings.list_url
-DATA_DIR = settings.data_dir
-PDF_DIR = settings.data_dir / "pdfs"
-OUTPUT_DIR = settings.data_dir / "output"
-LLM_BASE_URL = settings.llm_base_url
-LLM_API_KEY = settings.llm_api_key
-LLM_MODEL = settings.llm_model
