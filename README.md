@@ -123,10 +123,11 @@ flowchart LR
 
 **Medallion layers:**
 
-- **`data/raw/`** (bronze, immutable) — scraped HTML/detail pages, downloaded PDFs
-  (`raw/pdfs/<code>.pdf`), extracted covers (`raw/covers/<hash>.png`). Never mutated; a curation
-  bug found six months from now is fixable by re-running assembly against the same raw data,
-  not by re-scraping.
+- **`data/raw/`** (bronze, immutable) — downloaded PDFs (`raw/pdfs/<code>.pdf`) and extracted
+  covers (`raw/covers/<hash>.png`). Never mutated; a curation bug found six months from now is
+  fixable by re-running assembly against the same raw data, not by re-scraping. Listing/detail
+  HTML is fetched but not persisted here today — `scrape.py` carries a `TODO(step-5)` to write it
+  under `data/raw/` too, so a run could eventually be replayed without re-scraping.
 - **`data/staging/`** (silver) — one `EnrichedWork` JSON per work (`staging/works/<code>.json`):
   the raw listing entry, detail page, document hash, cover hash/path, description, and title/
   description translations, all in one normalized, schema-validated place.
@@ -246,10 +247,12 @@ challenge explicitly allows expanding — the two hard-contract shapes are never
   rate limit); jittered backoff (`with_retry` in `orchestrator/engine.py`) staggers retries so a
   transient blip doesn't turn into a synchronized thundering herd. The LLM is the slow stage — the
   queue exists specifically so a fast scraper can't outrun it and blow up memory.
-- **At-least-once + idempotent, resumable stages.** `download_pdf` skips if the PDF already exists;
-  `extract_cover` is content-addressed by hash, so re-running never duplicates; a crashed run
-  re-runs safely and picks back up rather than redoing finished work — the same principle a
-  production ingestion client needs.
+- **At-least-once, idempotent where it counts — not resumable everywhere.** `download_pdf` skips
+  if the PDF already exists; `extract_cover` is content-addressed by hash, so re-running never
+  duplicates either — a crashed run picks both back up without redoing that work. The LLM stages
+  (`describe`, `translate_title`, `translate_description`) have no such check today and re-run
+  against the provider on every pass; making them resumable too is future work, not a claim we
+  make here.
 - **The `TransientError` contract.** The engine only knows how to retry `TransientError` (plus
   plain `OSError`, for local I/O). Stages translate whatever their own HTTP/LLM client raises
   (`curl_cffi.requests.RequestsError`, Playwright's `Error`, `openai.APIConnectionError`/
@@ -357,10 +360,10 @@ All five. Nothing here is aspirational — each row is code that exists and is t
 
 | Area | Where |
 |---|---|
-| **Event-Driven** | `orchestrator/events.py` (typed events + pub/sub bus), `orchestrator/engine.py` (the generic bounded-queue worker pool), `pipeline.py` (the concrete work graph), `staging/accumulator.py` (the bus's actual consumer) |
+| **Event-Driven** | `orchestrator/events.py` (typed events + pub/sub bus — functional, not decorative: `staging/accumulator.py` builds the silver layer purely by reacting to it, and failures are counted through it); per-work stage sequencing itself is structured concurrency (nested `asyncio.gather` in `pipeline.py`), not event-chaining — see "Event-driven flow, honestly described" above |
 | **Data Architecture** | `data/raw` → `data/staging/works/*.json` → `data/curated/runs/<run_id>/`; `config.py`'s layer paths; the localized/universal dataset split |
 | **Versioning** | `run.py`'s `RunContext` — `run_id`, immutable per-run directory, `manifest.json`, `latest` pointer, re-runs never overwrite |
-| **Scalability** | `orchestrator/engine.py` — bounded queue (backpressure), semaphores (rate limiting), `with_retry` (backoff + full jitter); idempotent/resumable stages throughout `stages/` |
+| **Scalability** | `orchestrator/engine.py` — bounded queue (backpressure), semaphores (rate limiting), `with_retry` (backoff + full jitter); `download_pdf`/`extract_cover` are idempotent, the LLM stages (`describe`/`translate_*`) re-run every time |
 | **Data Quality** | `quality/normalize.py`, `curate.py` (quarantine), `dedup.py`, `report.py` → `quality_report.json`, wired into `stages/assemble.py` |
 
 ---
