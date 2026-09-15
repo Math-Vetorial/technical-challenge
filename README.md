@@ -294,6 +294,20 @@ Handled in `quality/` (Step 2), applied at assembly time (Step 5):
 
 ---
 
+## Operational notes
+
+**LLM rate limiting.** On a low OpenAI usage tier, `describe`'s vision calls are the first thing
+to get token/minute rate-limited (`openai.RateLimitError`, HTTP 429) — image payloads are large,
+and `LLM_CONCURRENCY` works run at once. The pipeline degrades gracefully rather than failing the
+run: `RateLimitError` is translated into the engine's `TransientError` contract, so `with_retry`'s
+exponential backoff + full jitter absorbs most 429s on its own; a work that still exhausts
+`MAX_RETRIES` is isolated as `WorkFailed` (logged, counted in the manifest under `failed`) — it
+does not stop the rest of the run. For a full real batch on a constrained tier, lower
+`LLM_CONCURRENCY` (fewer concurrent describe/translate calls competing for the same rate limit) or
+run against a higher-tier account/quota.
+
+---
+
 ## Testing
 
 Two kinds of tests, on purpose:
