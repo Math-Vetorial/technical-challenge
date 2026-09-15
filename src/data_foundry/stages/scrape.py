@@ -17,9 +17,11 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from bs4 import BeautifulSoup
 from curl_cffi import requests as cffi_requests
+from curl_cffi.requests import RequestsError
 
 from data_foundry.config import Settings
 from data_foundry.logging_setup import get_logger
+from data_foundry.orchestrator.engine import TransientError
 from data_foundry.schemas import RawListingEntry, WorkDetail
 
 logger = get_logger(__name__)
@@ -38,20 +40,20 @@ _DETAIL_FIELD_MAP = {
 }
 
 
-def _fetch_page_sync(url: str, timeout: int) -> str | None:
+def _fetch_page_sync(url: str, timeout: int) -> str:
     try:
         resp = _SESSION.get(url, timeout=timeout)
         if resp.status_code == 200 and "challenge" not in resp.text[:500].lower():
             return resp.text
-    except Exception as exc:  # noqa: BLE001 - any client failure falls through to the browser fallback
+    except RequestsError as exc:  # curl-cffi's own timeout/connection error -> try the browser fallback
         logger.warning("curl-cffi fetch failed url=%s error=%s", url, exc)
     return _fetch_page_playwright_sync(url, timeout)
 
 
-def _fetch_page_playwright_sync(url: str, timeout: int) -> str | None:
-    from playwright.sync_api import (
-        sync_playwright,  # heavy import, only needed on this fallback path
-    )
+def _fetch_page_playwright_sync(url: str, timeout: int) -> str:
+    # Heavy imports, only needed on this fallback path.
+    from playwright.sync_api import Error as PlaywrightError
+    from playwright.sync_api import sync_playwright
 
     try:
         with sync_playwright() as p:
@@ -61,12 +63,11 @@ def _fetch_page_playwright_sync(url: str, timeout: int) -> str | None:
             html = page.content()
             browser.close()
             return html
-    except Exception as exc:  # noqa: BLE001 - a browser-launch/navigation failure means "no page"
-        logger.warning("playwright fetch failed url=%s error=%s", url, exc)
-    return None
+    except PlaywrightError as exc:  # last resort exhausted -> the engine's retryable contract
+        raise TransientError(f"playwright fetch failed url={url}: {exc}") from exc
 
 
-async def fetch_page(url: str, settings: Settings) -> str | None:
+async def fetch_page(url: str, settings: Settings) -> str:
     return await asyncio.to_thread(_fetch_page_sync, url, settings.request_timeout_s)
 
 
@@ -119,9 +120,10 @@ async def scrape_listing(settings: Settings, limit: int | None = None) -> AsyncI
     while limit is None or yielded < limit:
         skip = (page - 1) * _PAGE_SIZE
         url = _with_page_params(settings.list_url, skip=skip, pagina=page)
-        html = await fetch_page(url, settings)
-        if not html:
-            logger.warning("listing page fetch failed page=%s", page)
+        try:
+            html = await fetch_page(url, settings)
+        except TransientError as exc:
+            logger.warning("listing page fetch failed page=%s error=%s", page, exc)
             return
         entries = parse_listing(html)
         if not entries:
@@ -167,11 +169,10 @@ def _find_download_url(html: str, base_url: str) -> str | None:
 
 
 async def fetch_detail(code: str, settings: Settings) -> WorkDetail:
+    """Fetch and parse a work's detail page. Raises `TransientError` on a network failure — the
+    caller (`pipeline.py`, via `with_retry`) is what retries it, not this function."""
     detail_url = f"{settings.base_url}/DetalheObraForm.do?select_action=&co_obra={code}"
     html = await fetch_page(detail_url, settings)
-    if not html:
-        return WorkDetail(code=code)
-
     metadata = _parse_detail_page(html)
     return WorkDetail(
         code=code,

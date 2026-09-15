@@ -27,9 +27,18 @@ from data_foundry.logging_setup import get_logger
 
 logger = get_logger(__name__)
 
-# TimeoutError and ConnectionError are both OSError subclasses; kept as one tuple so callers can
-# see at a glance what "transient" means here without chasing the stdlib hierarchy.
-TRANSIENT_ERRORS: tuple[type[BaseException], ...] = (OSError,)
+
+class TransientError(Exception):
+    """A stage's own signal that a failure is worth retrying (timeout, connection reset, a bad
+    or short response, ...). Stages translate whatever their HTTP/LLM client raises into this
+    at the boundary (e.g. `stages.download`, `stages.scrape`), so the engine's retry logic never
+    needs to know which library — or which of its own exception types — is behind the failure.
+    """
+
+
+# TransientError is the stage-level contract above; OSError stays retryable too since it covers
+# local I/O hiccups (disk, filesystem) that stages don't (and shouldn't need to) translate.
+TRANSIENT_ERRORS: tuple[type[BaseException], ...] = (TransientError, OSError)
 
 STOP = object()
 """Sentinel enqueued to signal a worker pool that no more items are coming."""
@@ -130,4 +139,4 @@ async def run_worker_pool[T, R](
     return stats
 
 
-__all__ = ["STOP", "TRANSIENT_ERRORS", "StageStats", "run_worker_pool", "with_retry"]
+__all__ = ["STOP", "TRANSIENT_ERRORS", "StageStats", "TransientError", "run_worker_pool", "with_retry"]

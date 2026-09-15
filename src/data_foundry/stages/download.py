@@ -11,8 +11,10 @@ import asyncio
 from pathlib import Path
 
 from curl_cffi import requests as cffi_requests
+from curl_cffi.requests import RequestsError
 
 from data_foundry.config import Settings
+from data_foundry.orchestrator.engine import TransientError
 from data_foundry.schemas import RawListingEntry, WorkDetail
 
 _SESSION = cffi_requests.Session(impersonate="chrome")
@@ -20,9 +22,12 @@ _MIN_VALID_PDF_BYTES = 1000
 
 
 def _download_sync(url: str, timeout: int) -> bytes:
-    resp = _SESSION.get(url, timeout=timeout)
+    try:
+        resp = _SESSION.get(url, timeout=timeout)
+    except RequestsError as exc:  # curl-cffi's own timeout/connection error -> the engine's contract
+        raise TransientError(f"download request failed url={url}: {exc}") from exc
     if resp.status_code != 200 or len(resp.content) < _MIN_VALID_PDF_BYTES:
-        raise ConnectionError(f"bad download response status={resp.status_code} bytes={len(resp.content)}")
+        raise TransientError(f"bad download response status={resp.status_code} bytes={len(resp.content)}")
     return resp.content
 
 
