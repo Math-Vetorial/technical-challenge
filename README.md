@@ -150,51 +150,56 @@ flowchart LR
 
 ## The two output datasets
 
-Both snippets below are real output from `make run-offline` (`SOURCE=fixtures` + `MockProvider` —
-hence the `[en]`/`[mock-description]` markers; a real `OpenAIProvider` run has natural-language
-text in their place).
+Both snippets below are real output from a real `make run` (`SOURCE=live`, `LLM_PROVIDER=openai`,
+`LLM_MODEL=gpt-4o-mini`) against the live Domínio Público catalog — not the mock. The offline path
+(`make run-offline`, `SOURCE=fixtures` + `MockProvider`) produces the exact same fields, just with
+deterministic mock text (`[en] ...`, `[mock-description] ...`) standing in for the real vision/
+translation output.
 
 **`localized_catalog.json`** — language-dependent fields:
 
 ```json
 {
-  "id": "fixture-001",
-  "author": "Eça de Queirós",
+  "id": "15713",
+  "author": "Joaquim Nabuco",
   "title": {
-    "pt": "A Cidade e as Serras",
-    "en": "[en] A Cidade e as Serras",
-    "es": "[es] A Cidade e as Serras",
-    "fr": "[fr] A Cidade e as Serras"
+    "pt": "A escravidão",
+    "en": "Slavery",
+    "es": "La esclavitud",
+    "fr": "L'esclavage"
   },
   "description": {
-    "pt": "[mock-description] A Cidade e as Serras (obra fixture-001)",
-    "en": "[en] [mock-description] A Cidade e as Serras (obra fixture-001)",
-    "es": "[es] [mock-description] A Cidade e as Serras (obra fixture-001)",
-    "fr": "[fr] [mock-description] A Cidade e as Serras (obra fixture-001)"
+    "pt": "O documento intitulado \"A escravidão\" aborda a história da escravidão, com foco em seu impacto social e econômico no Brasil. A metodologia utilizada pode incluir análise de fontes históricas e relatos, embora detalhes específicos não sejam visíveis. Os principais achados possivelmente discutem as condições de vida dos escravizados, as dinâmicas da sociedade escravocrata e as consequências da abolição.",
+    "en": "The document titled \"Slavery\" addresses the history of slavery, focusing on its social and economic impact in Brazil. The methodology used may include the analysis of historical sources and accounts, although specific details are not visible. The main findings possibly discuss the living conditions of the enslaved, the dynamics of the slave society, and the consequences of abolition.",
+    "es": "El documento titulado \"La esclavitud\" aborda la historia de la esclavitud, centrándose en su impacto social y económico en Brasil. La metodología utilizada puede incluir el análisis de fuentes históricas y relatos, aunque los detalles específicos no sean visibles. Los principales hallazgos posiblemente discutan las condiciones de vida de los esclavizados, las dinámicas de la sociedad esclavista y las consecuencias de la abolición.",
+    "fr": "Le document intitulé \"L'esclavage\" aborde l'histoire de l'esclavage, en se concentrant sur son impact social et économique au Brésil. La méthodologie utilisée peut inclure l'analyse de sources historiques et de témoignages, bien que des détails spécifiques ne soient pas visibles. Les principales conclusions discutent probablement des conditions de vie des esclaves, des dynamiques de la société esclavagiste et des conséquences de l'abolition."
   }
 }
 ```
 
-**`universal_metadata.json`** — language-independent fields:
+**`universal_metadata.json`** — language-independent fields (same `id`, same run):
 
 ```json
 {
-  "id": "fixture-001",
-  "document_hash": "eecb075198fbb0f92d34f11c616cd7653417db834ce4f1da48b8ad52562c496c",
-  "cover_path": "raw/covers/4ef0ddae6739f16481649759715361fec5481793097059436611f6062ba7eef2.png",
-  "accesses": null,
-  "size_bytes": 1061,
-  "category": "Romance",
-  "year": 1901,
+  "id": "15713",
+  "document_hash": "ed6ca8922b5b2e1c3616875f5825a143713f128402db8e2f1df17c25c3fe274b",
+  "cover_path": "raw/covers/a9c3e4c5a074105eecbff9547ff3c67808426d380b9853179a977de21f9e6887.png",
+  "accesses": 40230,
+  "size_bytes": 13968344,
+  "category": "História",
+  "year": null,
   "language": "pt",
-  "institution": null,
-  "source": "fixture catalog",
-  "run_id": "20260915T140751Z-678e8c20"
+  "institution": "[jn] Fundação Joaquim Nabuco",
+  "source": "[jn] Fundação Joaquim Nabuco",
+  "run_id": "20260915T151706Z-f47fa1cd"
 }
 ```
 
-(`accesses`/`institution` are `null` here because the fixture catalog doesn't set them — a real
-`SOURCE=live` scrape populates both from the listing/detail pages.)
+(`year` is `null` here because the detail page for this particular work didn't carry a parseable
+year — `parse_year` returns `None` rather than guessing, per the "never coerce garbage" rule above.
+This same live run also produced 4 `WorkFailed` entries from LLM rate limiting, exactly the
+scenario described in **Operational notes** further down this README — the run still finished
+`"success"`.)
 
 **Why split them at all?** Language-varying fields and language-independent invariants change for
 completely different reasons: adding French support touches only the localized catalog; recomputing
