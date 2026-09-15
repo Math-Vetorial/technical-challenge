@@ -96,14 +96,16 @@ class UniversalRecord(BaseModel):
 
 
 class EnrichedWork(BaseModel):
-    """Everything gathered about one work before curation (Step 2 input shape).
+    """Everything gathered about one work before curation — the silver layer.
 
-    TODO(step-3): the orchestrator builds these from the scrape/download/hash/describe/
-    translate/cover stage outputs and hands them to `quality.curate.curate_works`.
+    Built by `staging.accumulator.WorkAccumulator` from enrichment events as a run progresses,
+    flushed to `data/staging/works/<code>.json`, and handed to `quality.curate.curate_works` at
+    assembly time.
     """
 
     raw: RawListingEntry
     detail: WorkDetail | None = None
+    pdf_path: str | None = None
     document_hash: str | None = None
     cover_path: str | None = None
     cover_hash: str | None = None

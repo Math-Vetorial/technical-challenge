@@ -22,4 +22,9 @@ data/output/
 data/raw/
 data/staging/
 data/curated/
+
+# Synthetic fixture PDFs generated on demand (SOURCE=fixtures beyond the 3 curated works) —
+# cached for idempotency, never committed. The 3 curated tests/fixtures/pdfs/*.pdf files are.
+tests/fixtures/pdfs/_generated/
+
 .DS_Store

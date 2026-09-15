@@ -11,9 +11,11 @@ everything the download branch fans out to) has completed — success or `WorkFa
 crashing the run. That's `asyncio.gather` all the way down, so no separate "is everyone done yet"
 bookkeeping is needed: the outermost gather simply cannot return early.
 
-TODO(step-5): the per-work enrichment gathered here (document_hash, cover_path/hash, description,
-translations) isn't persisted to `data/staging/` yet — assembly will read it from wherever Step 5
-decides to land it, then run it through `quality.curate.curate_works` and dedup.
+After the barrier: the `WorkAccumulator` (subscribed to the same bus since before processing
+started) has built one `EnrichedWork` per work purely by reacting to events — this is what makes
+the bus functional rather than decorative. It flushes to the silver layer (`data/staging/works/`),
+then `stages.assemble.assemble(...)` curates + dedups it into the two gold-layer datasets and the
+quality report, written into this run's versioned curated directory.
 """
 
 from __future__ import annotations
@@ -41,13 +43,15 @@ from data_foundry.orchestrator.events import (
     WorkFailed,
 )
 from data_foundry.run import RunContext
-from data_foundry.schemas import RawListingEntry, WorkDetail
+from data_foundry.schemas import RawListingEntry, WorkDetail, dump_json
 from data_foundry.stages import covers as covers_stage
 from data_foundry.stages import describe as describe_stage
 from data_foundry.stages import download as download_stage
 from data_foundry.stages import hash as hash_stage
 from data_foundry.stages import scrape
 from data_foundry.stages import translate as translate_stage
+from data_foundry.stages.assemble import AssembleResult, assemble
+from data_foundry.staging.accumulator import WorkAccumulator
 
 logger = get_logger(__name__)
 
@@ -187,7 +191,7 @@ async def _download_branch(
         counters.inc("failed")
         return
 
-    bus.publish(PdfDownloaded(work_id=raw.code, pdf_path=pdf_path))
+    bus.publish(PdfDownloaded(work_id=raw.code, pdf_path=pdf_path, detail=detail))
     counters.inc("downloaded")
 
     await asyncio.gather(
@@ -222,6 +226,28 @@ def _log_failure(event: WorkFailed) -> None:
     logger.warning("work failed work_id=%s stage=%s error=%s", event.work_id, event.stage, event.error)
 
 
+def _write_curated_outputs(ctx: RunContext, result: AssembleResult) -> None:
+    outputs = {
+        "localized_catalog": (result.localized, ctx.run_dir / "localized_catalog.json"),
+        "universal_metadata": (result.universal, ctx.run_dir / "universal_metadata.json"),
+        "quality_report": (result.quality, ctx.run_dir / "quality_report.json"),
+    }
+    for name, (model, path) in outputs.items():
+        dump_json(model, path)
+        ctx.record_output(name, path)
+    ctx.set_quality(result.quality.model_dump(mode="json"))
+
+
+def _assembly_counts(result: AssembleResult) -> dict[str, int]:
+    kept = len(result.universal.root)
+    return {
+        "valid_works": kept,
+        "quarantined": len(result.quality.quarantined),
+        # dropped-as-duplicate = how many valid records didn't make it into the final dataset
+        "duplicates": result.quality.valid_works - kept,
+    }
+
+
 async def run(
     settings: Settings = default_settings,
     *,
@@ -233,8 +259,7 @@ async def run(
     """Run the full event-driven pipeline (or a single stage in isolation via `only`).
 
     `bus` is injectable so tests/callers can subscribe to per-work events (Hashed, Described, ...)
-    before the run starts — there's nowhere else to observe that enrichment yet (TODO(step-5):
-    once it's persisted to `data/staging/`, that becomes the durable way to inspect it).
+    directly, alongside the `WorkAccumulator` this function always wires up.
     """
     provider = provider or get_provider(settings)
 
@@ -243,6 +268,8 @@ async def run(
 
     ctx = RunContext.create(settings)
     bus = bus or EventBus()
+    accumulator = WorkAccumulator()
+    accumulator.subscribe_to(bus)
 
     async def on_failed(event: WorkFailed) -> None:
         _log_failure(event)
@@ -278,18 +305,26 @@ async def run(
     await worker_task
     await bus.drain()
 
-    # Every per-work failure is isolated (WorkFailed + counts), never raised here, so reaching
-    # this point means the run itself completed — individual work outcomes are in the manifest.
+    try:
+        accumulator.flush(settings.staging_dir)
+        result = assemble(accumulator.works(), ctx.run_id)
+        _write_curated_outputs(ctx, result)
+    except Exception:
+        ctx.finish("failed")
+        raise
+
+    ctx.update_counts(**counters.snapshot(), **_assembly_counts(result))
     ctx.finish("success")
-    logger.info("run finished status=success counts=%s manifest=%s", counters.snapshot(), ctx.manifest_path)
+    logger.info("run finished status=success counts=%s manifest=%s", ctx.manifest.counts, ctx.manifest_path)
     return ctx
 
 
 async def _run_only_stage(stage: str, settings: Settings) -> RunContext:
     """Run one stage over already-available raw data — for `make <stage>` / debugging.
 
-    TODO(step-5): once per-work state lands in `data/staging/`, every stage (including
-    describe/translate, which need catalog context) can be replayed this way.
+    A full `run()` now persists per-work state to `data/staging/works/<code>.json`; teaching this
+    ad-hoc single-stage path (describe/translate need catalog context) to replay from it is a
+    future enhancement, not needed by anything that calls `--only` today.
     """
     if stage not in ONLY_STAGES:
         raise ValueError(f"unknown stage {stage!r}, expected one of {ONLY_STAGES}")

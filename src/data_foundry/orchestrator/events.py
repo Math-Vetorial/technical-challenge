@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from data_foundry.schemas import RawListingEntry
+from data_foundry.schemas import RawListingEntry, WorkDetail
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +27,7 @@ class WorkDiscovered:
 class PdfDownloaded:
     work_id: str
     pdf_path: Path
+    detail: WorkDetail
 
 
 @dataclass(frozen=True, slots=True)
