@@ -10,6 +10,7 @@ barrier batch once every work is processed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -57,6 +58,20 @@ def build_localized(
     )
 
 
+def _relative_cover_path(cover_path: str | None, data_dir: Path | None) -> str | None:
+    """The persisted datasets must be portable — never bake this machine's absolute path in.
+
+    Internal state (EnrichedWork, staging JSON) can stay absolute; only at the point a
+    UniversalRecord is built do we relativize to `data_dir` (e.g. `raw/covers/<hash>.png`).
+    """
+    if cover_path is None or data_dir is None:
+        return cover_path
+    try:
+        return str(Path(cover_path).relative_to(data_dir))
+    except ValueError:
+        return cover_path  # not under data_dir (e.g. an already-relative test path) -> leave as-is
+
+
 def build_universal(
     raw: RawListingEntry,
     detail: WorkDetail | None,
@@ -64,12 +79,13 @@ def build_universal(
     cover_path: str | None,
     size_bytes: int | None,
     run_id: str | None = None,
+    data_dir: Path | None = None,
 ) -> UniversalRecord:
     detail = detail or WorkDetail(code=raw.code)
     return UniversalRecord(
         id=raw.code,
         document_hash=doc_hash,
-        cover_path=cover_path,
+        cover_path=_relative_cover_path(cover_path, data_dir),
         accesses=parse_int_locale(detail.accesses or raw.accesses),
         size_bytes=size_bytes,
         category=clean_text(null_if_sentinel(detail.category)),
@@ -88,7 +104,9 @@ class CurateResult:
     quarantined: list[QuarantinedRecord] = field(default_factory=list)
 
 
-def curate_works(works: list[EnrichedWork], run_id: str | None = None) -> CurateResult:
+def curate_works(
+    works: list[EnrichedWork], run_id: str | None = None, data_dir: Path | None = None
+) -> CurateResult:
     """Build + validate both records per work; quarantine instead of raising on failure."""
     result = CurateResult()
     for work in works:
@@ -106,6 +124,7 @@ def curate_works(works: list[EnrichedWork], run_id: str | None = None) -> Curate
                 cover_path=work.cover_path,
                 size_bytes=work.size_bytes,
                 run_id=run_id,
+                data_dir=data_dir,
             )
         except ValidationError as exc:
             result.quarantined.append(

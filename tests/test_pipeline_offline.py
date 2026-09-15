@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 
 from data_foundry import pipeline
 from data_foundry.config import Settings
@@ -30,8 +32,8 @@ def _settings(tmp_path) -> Settings:
 
 
 class _Recorder:
-    """Collects the events a full run emits — there's no staging/curated persistence to inspect
-    yet (that lands in Step 5), so the bus is the only window into per-work enrichment today."""
+    """Collects the events a full run emits, for asserting on per-work enrichment directly
+    (the curated/staged files are also inspected separately, in their own tests)."""
 
     def __init__(self) -> None:
         self.hashed: dict[str, str] = {}
@@ -119,6 +121,20 @@ def test_pipeline_run_offline_enriches_three_works_with_no_network(tmp_path):
     assert counts["title_translated"] == 3
     assert counts["description_translated"] == 3
     assert counts.get("failed", 0) == 0
+
+
+def test_pipeline_run_offline_universal_metadata_has_portable_cover_paths(tmp_path):
+    """The persisted dataset must never bake in this machine's absolute path (regression: it did,
+    via EnrichedWork.cover_path flowing straight through to UniversalRecord.cover_path)."""
+    _, _, ctx = _run_offline(tmp_path)
+
+    data = json.loads((ctx.run_dir / "universal_metadata.json").read_text(encoding="utf-8"))
+    assert len(data) == 3
+    for entry in data:
+        cover_path = entry["cover_path"]
+        assert cover_path is not None
+        assert not Path(cover_path).is_absolute()
+        assert cover_path.startswith("raw/covers/")
 
 
 def test_pipeline_run_offline_is_deterministic_across_runs(tmp_path):

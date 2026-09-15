@@ -6,6 +6,7 @@ from the enrichment events — this is where the silver layer becomes the gold l
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from data_foundry.quality.curate import curate_works
 from data_foundry.quality.dedup import dedup_by_document_hash, find_duplicate_covers
@@ -25,9 +26,13 @@ class AssembleResult:
     quality: QualityReport
 
 
-def assemble(works: list[EnrichedWork], run_id: str | None = None) -> AssembleResult:
-    """Curate every work, dedup by `document_hash`, keep both datasets aligned to one id set."""
-    curate_result = curate_works(works, run_id=run_id)
+def assemble(works: list[EnrichedWork], run_id: str | None = None, data_dir: Path | None = None) -> AssembleResult:
+    """Curate every work, dedup by `document_hash`, keep both datasets aligned to one id set.
+
+    `data_dir` relativizes `cover_path` in the persisted `UniversalRecord`s — the datasets must be
+    portable, never bake in this machine's absolute path.
+    """
+    curate_result = curate_works(works, run_id=run_id, data_dir=data_dir)
 
     deduped_universal, doc_groups = dedup_by_document_hash(curate_result.universal)
     cover_groups = find_duplicate_covers({work.raw.code: work.cover_hash for work in works})

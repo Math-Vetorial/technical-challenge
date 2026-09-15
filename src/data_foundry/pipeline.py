@@ -307,7 +307,7 @@ async def run(
 
     try:
         accumulator.flush(settings.staging_dir)
-        result = assemble(accumulator.works(), ctx.run_id)
+        result = assemble(accumulator.works(), ctx.run_id, data_dir=settings.data_dir)
         _write_curated_outputs(ctx, result)
     except Exception:
         ctx.finish("failed")

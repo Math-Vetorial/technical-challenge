@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from data_foundry.quality.curate import build_localized, build_universal, curate_works
 from data_foundry.schemas import EnrichedWork, RawListingEntry, WorkDetail
 
@@ -34,6 +36,36 @@ def test_build_universal_well_formed():
     assert record.accesses == 1234
     assert record.category == "Romance"
     assert record.run_id == "20260101T000000Z-aaaaaaaa"
+
+
+def test_build_universal_cover_path_is_relative_to_data_dir():
+    data_dir = Path("/Users/someone/project/data")
+    absolute_cover = data_dir / "raw" / "covers" / ("a" * 64 + ".png")
+
+    record = build_universal(
+        raw=_raw(),
+        detail=None,
+        doc_hash=None,
+        cover_path=str(absolute_cover),
+        size_bytes=None,
+        data_dir=data_dir,
+    )
+
+    assert record.cover_path == f"raw/covers/{'a' * 64}.png"
+    assert not Path(record.cover_path).is_absolute()
+
+
+def test_build_universal_cover_path_outside_data_dir_is_left_as_is():
+    record = build_universal(
+        raw=_raw(),
+        detail=None,
+        doc_hash=None,
+        cover_path="covers/obra1.png",  # already relative, e.g. from a unit test
+        size_bytes=None,
+        data_dir=Path("/some/other/data"),
+    )
+
+    assert record.cover_path == "covers/obra1.png"
 
 
 def test_build_universal_without_detail_falls_back_to_raw():
