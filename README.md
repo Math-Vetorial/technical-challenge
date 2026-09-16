@@ -71,7 +71,7 @@ process environment or a `.env` file (see `.env.example`).
 | `QUEUE_MAXSIZE` | `16` | Bounded queue between `scrape` and the download worker pool — the backpressure boundary |
 | `MAX_RETRIES` | `3` | Retries per stage call on a `TransientError`, exponential backoff + full jitter |
 | `RETRY_BASE_DELAY_S` | `0.5` | Base delay (seconds) for that backoff |
-| `REQUEST_TIMEOUT_S` | `30` | HTTP/LLM call timeout |
+| `REQUEST_TIMEOUT_S` | `120` | HTTP/LLM call timeout |
 | `MIN_BOOKS` | `10` | The challenge's minimum catalog size (informational; not yet enforced as a hard gate) |
 | `DATA_DIR` | `./data` | Root of the medallion layers (`<DATA_DIR>/{raw,staging,curated}`) |
 

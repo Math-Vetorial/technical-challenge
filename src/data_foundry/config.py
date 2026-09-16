@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # Scale knobs — consumed by the async orchestrator (orchestrator/engine.py, pipeline.py)
     download_concurrency: int = 4
     llm_concurrency: int = 2
-    request_timeout_s: int = 30
+    request_timeout_s: int = 120
     max_retries: int = 3
     min_books: int = 10
     queue_maxsize: int = 16
