@@ -53,6 +53,12 @@ There are three tiers, picked via env, not code:
 10-work minimum without waiting on the entire live catalog; override it in `.env` (see
 `.env.example`) to process more, or drop the limit to run the whole thing.
 
+`.env.example` also defaults `LLM_CONCURRENCY=1` (`config.py`'s own built-in default is `2`,
+still configurable) — against a local CPU-bound vision model, two concurrent describe calls
+fight over the same CPU and blow past the timeout, so the shipped local config serializes them
+to complete cleanly. Raise it back up once you're pointed at a hosted API (OpenAI) that can
+actually take the parallelism.
+
 On CPU-only setups (e.g. Docker Desktop on a Mac, no GPU passthrough) the vision model is slow —
 **minutes per work is expected**, so `make run` can look stalled when it's really just working
 through a small local model on the CPU. To see the pipeline run fast end-to-end, use
