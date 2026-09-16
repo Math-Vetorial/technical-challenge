@@ -36,6 +36,28 @@ make run        # full pipeline via Docker + Ollama (real scrape + real LLM)
 make test       # hermetic offline test suite — no network, no GPU, no Docker
 ```
 
+### Running with a real LLM
+
+There are three tiers, picked via env, not code:
+
+- **`mock`** — offline, deterministic, no API key, no GPU. The fast path; `make test` and
+  `make run-offline` always use it (see below).
+- **Ollama, local** — real vision/translation calls, no API key needed. `make run`'s default —
+  it's what `docker compose up --build pipeline` talks to via the `ollama` service.
+- **OpenAI** — real, generally faster and better than a small local model, but needs the
+  evaluator's own `LLM_API_KEY`. Swapping to it is an env change (`LLM_PROVIDER`/`LLM_BASE_URL`/
+  `LLM_API_KEY`/`LLM_MODEL`), never a code change. The provider abstraction has been exercised
+  against both Ollama and OpenAI.
+
+`make run` processes `RUN_LIMIT` works by default (**12**) — enough to clear the challenge's
+10-work minimum without waiting on the entire live catalog; override it in `.env` (see
+`.env.example`) to process more, or drop the limit to run the whole thing.
+
+On CPU-only setups (e.g. Docker Desktop on a Mac, no GPU passthrough) the vision model is slow —
+**minutes per work is expected**, so `make run` can look stalled when it's really just working
+through a small local model on the CPU. To see the pipeline run fast end-to-end, use
+`make run-offline` instead.
+
 ### The offline path (no network, no GPU)
 
 Every stage that would otherwise hit the network or a model has an offline mode, and they compose:

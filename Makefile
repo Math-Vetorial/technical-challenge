@@ -16,7 +16,7 @@ run:
 	docker compose up --build pipeline
 
 run-local:
-	uv run python -m data_foundry run
+	uv run python -m data_foundry run --limit $${RUN_LIMIT:-12}
 
 # Fully offline: no network, no GPU. Deterministic mock LLM + committed/generated PDF fixtures —
 # the same env `make test` uses, just driving the CLI end-to-end instead of pytest.

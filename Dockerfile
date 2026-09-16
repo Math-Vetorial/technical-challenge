@@ -8,4 +8,4 @@ COPY . .
 
 RUN uv sync
 
-CMD ["uv", "run", "python", "-m", "data_foundry", "run"]
+CMD ["sh", "-c", "uv run python -m data_foundry run --limit ${RUN_LIMIT:-12}"]
